@@ -1,4 +1,5 @@
 import os
+os.environ["STREAMLIT_THEME_BASE"] = "light"
 import shutil
 import re
 import streamlit as st
@@ -28,6 +29,7 @@ def apply_custom_theme():
 
         html, body, [class*="css"], .stTextInput > label, .stSelectbox > label, .stMarkdown {
             font-family: 'Outfit', sans-serif !important;
+            color-scheme: light !important;
         }
 
         #MainMenu {visibility: hidden;}
