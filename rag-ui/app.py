@@ -6,6 +6,23 @@ import streamlit.components.v1 as components
 from pathlib import Path
 from dotenv import load_dotenv
 
+# ------------------------------------------------------
+# Force Light Mode & Disable Theme Switcher
+# By defining a theme in config.toml, Streamlit automatically
+# defaults to it and hides the Light/Dark toggle in Settings.
+# ------------------------------------------------------
+os.makedirs(".streamlit", exist_ok=True)
+config_path = ".streamlit/config.toml"
+if not os.path.exists(config_path):
+    with open(config_path, "w") as f:
+        f.write("[theme]\nbase=\"light\"\n")
+else:
+    with open(config_path, "r") as f:
+        config_data = f.read()
+    if "[theme]" not in config_data:
+        with open(config_path, "a") as f:
+            f.write("\n[theme]\nbase=\"light\"\n")
+
 # Set UI Configuration first
 st.set_page_config(page_title="Nexus | Enterprise RAG", page_icon="✨", layout="wide")
 
