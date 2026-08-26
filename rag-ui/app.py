@@ -10,51 +10,106 @@ from dotenv import load_dotenv
 st.set_page_config(page_title="Nexus | Enterprise RAG", page_icon="✨", layout="wide")
 
 # ------------------------------------------------------
+# Ambient Background Injection
+# ------------------------------------------------------
+st.markdown("""
+    <div class="ambient-blob blob-1"></div>
+    <div class="ambient-blob blob-2"></div>
+    <div class="ambient-blob blob-3"></div>
+""", unsafe_allow_html=True)
+
+# ------------------------------------------------------
 # 2026 Modern SaaS UI Theme (Glassmorphism & Minimalism)
 # ------------------------------------------------------
 def apply_custom_theme():
     st.markdown("""
     <style>
-        /* 1. Import a hyper-modern, highly legible geometric font */
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
         html, body, [class*="css"], .stTextInput > label, .stSelectbox > label, .stMarkdown {
             font-family: 'Outfit', sans-serif !important;
         }
 
-        /* 2. Hide standard Streamlit chrome for a native-app feel */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {background-color: transparent !important;}
 
-        /* 3. The Canvas: Subtle ambient background */
         .stApp {
             background-color: #fafbfc;
-            background-image: radial-gradient(circle at 10% 20%, rgba(240, 242, 250, 1) 0%, rgba(255, 255, 255, 1) 90%);
+            background-image: radial-gradient(circle at 10% 20%, rgba(240, 242, 250, 0.8) 0%, rgba(255, 255, 255, 0.8) 90%);
         }
 
-        /* 4. The Sidebar: Liquid Glass (Glassmorphism) */
+        .ambient-blob {
+            position: fixed;
+            filter: blur(90px);
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none; 
+        }
+        
+        .blob-1 {
+            top: -10%; left: -10%;
+            width: 50vw; height: 50vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 65, 108, 0.3) 0%, rgba(255, 65, 108, 0) 70%);
+            animation: float1 20s infinite alternate ease-in-out;
+        }
+        
+        .blob-2 {
+            bottom: -20%; right: -10%;
+            width: 60vw; height: 60vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, rgba(139, 92, 246, 0) 70%);
+            animation: float2 25s infinite alternate-reverse ease-in-out;
+        }
+
+        .blob-3 {
+            top: 20%; right: 20%;
+            width: 40vw; height: 40vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0) 70%);
+            animation: float3 22s infinite alternate ease-in-out;
+        }
+
+        @keyframes float1 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(10%, 15%) scale(1.1); } }
+        @keyframes float2 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-15%, -10%) scale(1.2); } }
+        @keyframes float3 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-20%, 20%) scale(1.15); } }
+
+        .block-container, [data-testid="stSidebar"] {
+            z-index: 1;
+        }
+
         [data-testid="stSidebar"] {
-            background: rgba(255, 255, 255, 0.6) !important;
-            backdrop-filter: blur(20px) !important;
-            -webkit-backdrop-filter: blur(20px) !important;
-            border-right: 1px solid rgba(0, 0, 0, 0.04) !important;
+            background: rgba(255, 255, 255, 0.4) !important;
+            backdrop-filter: blur(25px) !important;
+            -webkit-backdrop-filter: blur(25px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.5) !important;
         }
 
-        /* 5. Main Title: Elegantly subdued, premium gradient */
+        @keyframes title-flow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
         h1 {
-            font-weight: 700 !important;
+            font-weight: 800 !important;
             letter-spacing: -1px;
-            background: linear-gradient(135deg, #18181b 0%, #71717a 100%);
+            text-align: center;
+            background: linear-gradient(-45deg, #FF4B2B, #FF416C, #2563eb, #8B5CF6);
+            background-size: 300% 300%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 1rem !important;
+            animation: title-flow 6s ease infinite;
+            filter: drop-shadow(0px 4px 15px rgba(37, 99, 235, 0.2));
+            margin-bottom: 0.5rem !important;
         }
 
-        /* 6. Chat Interface: Bento-style Floating Cards */
         [data-testid="stChatMessage"] {
-            background: #ffffff;
-            border: 1px solid rgba(0, 0, 0, 0.03);
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
             border-radius: 18px;
             padding: 1.5rem;
             box-shadow: 0 4px 16px rgba(0,0,0,0.02);
@@ -67,25 +122,23 @@ def apply_custom_theme():
             box-shadow: 0 10px 24px rgba(0,0,0,0.05);
         }
 
-        /* Avatar tuning */
         [data-testid="chatAvatarIcon-user"] { background-color: #18181b; }
         [data-testid="chatAvatarIcon-assistant"] { background-color: #3b82f6; }
 
-        /* 7. Chat Input Bar: Frosted floating pill */
         .stChatInputContainer {
             border-radius: 24px !important;
             box-shadow: 0 8px 30px rgba(0,0,0,0.06) !important;
             border: 1px solid rgba(255, 255, 255, 0.8) !important;
-            background: rgba(255, 255, 255, 0.85) !important;
-            backdrop-filter: blur(12px) !important;
+            background: rgba(255, 255, 255, 0.6) !important;
+            backdrop-filter: blur(20px) !important;
             padding: 0.2rem 1rem !important;
         }
 
-        /* 8. Buttons: Soft tactile microinteractions */
         .stButton>button {
             border-radius: 12px !important;
-            border: 1px solid rgba(0,0,0,0.06) !important;
-            background: #ffffff !important;
+            border: 1px solid rgba(255,255,255,0.6) !important;
+            background: rgba(255,255,255,0.7) !important;
+            backdrop-filter: blur(10px) !important;
             font-weight: 500 !important;
             color: #27272a !important;
             transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -99,7 +152,6 @@ def apply_custom_theme():
             box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
         }
 
-        /* Primary Button (Upload / Action buttons) */
         .stButton>button[kind="primary"] {
             background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
             color: #ffffff !important;
@@ -110,11 +162,11 @@ def apply_custom_theme():
             box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3) !important;
         }
 
-        /* 9. Expanders & Status boxes */
         [data-testid="stExpander"] {
-            border: 1px solid rgba(0,0,0,0.04);
+            border: 1px solid rgba(255,255,255,0.8);
             border-radius: 12px;
-            background: #fafafa;
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(10px);
         }
         .streamlit-expanderHeader {
             font-weight: 500 !important;
@@ -143,7 +195,6 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # Helper Functions
 # ------------------------------------------------------
 def render_mermaid(code: str):
-    """Takes Mermaid.js code and renders it as an HTML graphic in Streamlit."""
     components.html(
         f"""
         <div class="mermaid" style="display: flex; justify-content: center; background-color: transparent; padding: 20px; border-radius: 10px;">
@@ -158,7 +209,6 @@ def render_mermaid(code: str):
     )
 
 def extract_and_render_visuals(text: str):
-    """Scans the LLM's response for Mermaid code blocks and renders them."""
     mermaid_blocks = re.findall(r'```mermaid\n(.*?)\n```', text, re.DOTALL)
     for block in mermaid_blocks:
         render_mermaid(block)
@@ -195,7 +245,111 @@ def delete_individual_file(filename):
         build_index()
 
 # ------------------------------------------------------
-# 1. Sidebar: Authentication & Document Management
+# 1. Main Window: Chat Interface
+# ------------------------------------------------------
+st.title("✨ Nexus RAG Assistant")
+
+st.markdown("<p style='text-align: center; font-size: 1.15rem; color: #64748b; margin-bottom: 2rem;'>Ask questions based on your ingested documents. The assistant provides inline citations and can <b>understand and generate visual diagrams</b> out of the documents provided.</p>", unsafe_allow_html=True)
+
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hello! I am ready to answer questions based on your documents. What would you like to know?"}
+    ]
+
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        
+        if msg["role"] == "assistant":
+            extract_and_render_visuals(msg["content"])
+            
+        if "sources" in msg and msg["sources"]:
+            with st.expander("📚 View Source Documents"):
+                for idx, doc in enumerate(msg["sources"]):
+                    source_name = doc.metadata.get('source_file', 'Unknown')
+                    page = doc.metadata.get('page', 'N/A')
+                    st.markdown(f"**{idx+1}. {source_name}** (Page: {page})")
+                    st.caption(doc.page_content.replace('\n', ' ')[:300] + "...")
+
+# ------------------------------------------------------
+# 2. Query Processing & Response Generation
+# ------------------------------------------------------
+chat_disabled = "api_key" not in st.session_state or not st.session_state.api_key
+
+if query := st.chat_input("Ask a question about your documents...", disabled=chat_disabled):
+    
+    st.session_state.messages.append({"role": "user", "content": query})
+    with st.chat_message("user"):
+        st.markdown(query)
+        
+    with st.chat_message("assistant"):
+        with st.status("Searching knowledge base...", expanded=True) as status:
+            st.write("🔎 Fetching candidates from ChromaDB...")
+            retriever = get_retriever()
+            
+            st.write("⚡ Reranking context with FlashRank...")
+            docs = retriever.invoke(query)
+            status.update(label=f"Retrieved {len(docs)} highly relevant chunks.", state="complete", expanded=False)
+            
+        if docs:
+            with st.expander(f"📚 View {len(docs)} Source Documents"):
+                for idx, doc in enumerate(docs):
+                    source_name = doc.metadata.get('source_file', 'Unknown')
+                    page = doc.metadata.get('page', 'N/A')
+                    st.markdown(f"**{idx+1}. {source_name}** (Page: {page})")
+                    st.caption(doc.page_content.replace('\n', ' ')[:300] + "...")
+        else:
+            st.info("No highly relevant documents found.")
+            
+        formatted_context = format_docs_with_citations(docs)
+        
+        system_prompt = """You are an expert, precise AI assistant for answering questions based ONLY on the provided context.
+        
+        Context Documents:
+        {context}
+        
+        Instructions:
+        1. Answer the question using ONLY facts found in the provided context documents.
+        2. Do NOT use outside knowledge or hallucinate.
+        3. If the context does not contain the answer, reply exactly with: "I could not find relevant information in the provided documents."
+        4. Provide inline citations citing the source document using the format: [Doc: filename.pdf, Page: X].
+        5. If the user asks for a visual representation, chart, diagram, or process flow, extract the relevant data from the context and generate a Mermaid.js diagram.
+        6. When creating a diagram, ALWAYS wrap the code strictly inside a markdown block labeled 'mermaid'. 
+        Example:
+        ```mermaid
+        graph TD;
+            A[Start] --> B[Process];
+        ```
+        """
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "{question}")
+        ])
+        
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-3.6-flash", 
+            api_key=st.session_state.api_key, 
+            temperature=0
+        )
+        
+        chain = prompt | llm | StrOutputParser()
+        
+        response = st.write_stream(chain.stream({
+            "context": formatted_context, 
+            "question": query
+        }))
+        
+        extract_and_render_visuals(response)
+        
+        st.session_state.messages.append({
+            "role": "assistant", 
+            "content": response,
+            "sources": docs
+        })
+
+# ------------------------------------------------------
+# 3. Sidebar: Authentication & Document Management (MOVED TO BOTTOM)
 # ------------------------------------------------------
 with st.sidebar:
     st.header("🔑 Authentication")
@@ -203,6 +357,7 @@ with st.sidebar:
     if "api_key" in st.session_state and st.session_state.api_key:
         st.success("API Key securely loaded")
         
+        # This will now correctly detect when you have chat history!
         if "messages" in st.session_state and len(st.session_state.messages) > 1:
             chat_transcript = generate_chat_transcript(st.session_state.messages)
             st.download_button("💾 Download Chat History", data=chat_transcript, file_name="nexus_chat_history.txt", mime="text/plain", use_container_width=True)
@@ -274,108 +429,3 @@ with st.sidebar:
                 st.session_state.messages = [{"role": "assistant", "content": "Knowledge base completely wiped. Upload new documents to begin."}]
         st.success("Knowledge base cleared.")
         st.rerun()
-
-# ------------------------------------------------------
-# 2. Main Window: Chat Interface
-# ------------------------------------------------------
-st.title("✨ Nexus RAG Assistant")
-st.markdown("Ask questions based on your ingested documents. The assistant provides inline citations.")
-
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Hello! I am ready to answer questions based on your documents. What would you like to know?"}
-    ]
-
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-        
-        # Check and render any visuals that were generated in the past conversation
-        if msg["role"] == "assistant":
-            extract_and_render_visuals(msg["content"])
-            
-        if "sources" in msg and msg["sources"]:
-            with st.expander("📚 View Source Documents"):
-                for idx, doc in enumerate(msg["sources"]):
-                    source_name = doc.metadata.get('source_file', 'Unknown')
-                    page = doc.metadata.get('page', 'N/A')
-                    st.markdown(f"**{idx+1}. {source_name}** (Page: {page})")
-                    st.caption(doc.page_content.replace('\n', ' ')[:300] + "...")
-
-# ------------------------------------------------------
-# 3. Query Processing & Response Generation
-# ------------------------------------------------------
-chat_disabled = "api_key" not in st.session_state or not st.session_state.api_key
-
-if query := st.chat_input("Ask a question about your documents...", disabled=chat_disabled):
-    
-    st.session_state.messages.append({"role": "user", "content": query})
-    with st.chat_message("user"):
-        st.markdown(query)
-        
-    with st.chat_message("assistant"):
-        with st.status("Searching knowledge base...", expanded=True) as status:
-            st.write("🔎 Fetching candidates from ChromaDB...")
-            retriever = get_retriever()
-            
-            st.write("⚡ Reranking context with FlashRank...")
-            docs = retriever.invoke(query)
-            status.update(label=f"Retrieved {len(docs)} highly relevant chunks.", state="complete", expanded=False)
-            
-        if docs:
-            with st.expander(f"📚 View {len(docs)} Source Documents"):
-                for idx, doc in enumerate(docs):
-                    source_name = doc.metadata.get('source_file', 'Unknown')
-                    page = doc.metadata.get('page', 'N/A')
-                    st.markdown(f"**{idx+1}. {source_name}** (Page: {page})")
-                    st.caption(doc.page_content.replace('\n', ' ')[:300] + "...")
-        else:
-            st.info("No highly relevant documents found.")
-            
-        formatted_context = format_docs_with_citations(docs)
-        
-        system_prompt = """You are an expert, precise AI assistant for answering questions based ONLY on the provided context.
-        
-        Context Documents:
-        {context}
-        
-        Instructions:
-        1. Answer the question using ONLY facts found in the provided context documents.
-        2. Do NOT use outside knowledge or hallucinate.
-        3. If the context does not contain the answer, reply exactly with: "I could not find relevant information in the provided documents."
-        4. Provide inline citations citing the source document using the format: [Doc: filename.pdf, Page: X].
-        5. If the user asks for a visual representation, chart, diagram, or process flow, extract the relevant data from the context and generate a Mermaid.js diagram.
-        6. When creating a diagram, ALWAYS wrap the code strictly inside a markdown block labeled 'mermaid'. 
-        Example:
-        ```mermaid
-        graph TD;
-            A[Start] --> B[Process];
-        ```
-        """
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("human", "{question}")
-        ])
-        
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-3.6-flash", 
-            api_key=st.session_state.api_key, 
-            temperature=0
-        )
-        
-        chain = prompt | llm | StrOutputParser()
-        
-        response = st.write_stream(chain.stream({
-            "context": formatted_context, 
-            "question": query
-        }))
-        
-        # Immediately render any charts that were just generated
-        extract_and_render_visuals(response)
-        
-        st.session_state.messages.append({
-            "role": "assistant", 
-            "content": response,
-            "sources": docs
-        })
