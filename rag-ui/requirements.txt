@@ -1,8 +1,11 @@
-langchain>=0.2.0
+streamlit
 langchain-core
+langchain-classic
 langchain-community
-langchain-openai
+langchain-google-genai
 langchain-chroma
+langchain-huggingface
+sentence-transformers
 chromadb
 flashrank
 pypdf
@@ -11,3 +14,4 @@ unstructured
 markdown
 python-dotenv
 SQLAlchemy
+watchdog
