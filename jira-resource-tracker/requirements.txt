@@ -1,0 +1,6 @@
+streamlit
+jira
+pandas
+altair
+python-dotenv
+urllib3
