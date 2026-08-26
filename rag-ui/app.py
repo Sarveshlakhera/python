@@ -355,8 +355,7 @@ if query := st.chat_input("Ask a question about your documents...", disabled=cha
         
         llm = ChatGoogleGenerativeAI(
             model="gemini-3.6-flash", 
-            api_key=st.session_state.api_key, 
-            temperature=0
+            api_key=st.session_state.api_key
         )
         
         chain = prompt | llm | StrOutputParser()
