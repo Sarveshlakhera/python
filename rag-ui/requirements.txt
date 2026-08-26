@@ -1,0 +1,13 @@
+langchain>=0.2.0
+langchain-core
+langchain-community
+langchain-openai
+langchain-chroma
+chromadb
+flashrank
+pypdf
+docx2txt
+unstructured
+markdown
+python-dotenv
+SQLAlchemy
