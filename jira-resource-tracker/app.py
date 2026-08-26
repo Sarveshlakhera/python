@@ -30,6 +30,32 @@ st.markdown("""
 def apply_custom_theme():
     st.markdown("""
     <style>
+        /* ---------------------------------------------------
+           FORCE LIGHT MODE & DISABLE THEME TOGGLE
+           --------------------------------------------------- */
+        /* Hide the top right toolbar to prevent users from toggling dark mode */
+        [data-testid="stToolbar"] {
+            display: none !important;
+        }
+
+        /* Force standard text to dark gray (Light Mode aesthetics) */
+        .stApp, .stMarkdown, p, label, li, span {
+            color: #1e293b !important;
+        }
+
+        /* Preserve title gradients and primary button text */
+        h1, h2, h3, h4, h5, h6 {
+            color: inherit !important;
+        }
+        .stButton>button[kind="primary"] {
+            color: #ffffff !important;
+        }
+        .stButton>button[kind="primary"] * {
+            color: #ffffff !important;
+        }
+        
+        /* --------------------------------------------------- */
+
         /* Import Google Font */
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
@@ -42,7 +68,7 @@ def apply_custom_theme():
 
         /* Main App Background */
         .stApp {
-            background-color: #fafbfc;
+            background-color: #fafbfc !important;
             background-image: radial-gradient(circle at 10% 20%, rgba(240, 242, 250, 0.8) 0%, rgba(255, 255, 255, 0.8) 90%);
         }
 
