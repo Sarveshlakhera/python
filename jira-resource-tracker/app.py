@@ -15,18 +15,206 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 st.set_page_config(page_title="Jira Resource Tracker", layout="wide", page_icon="📊", initial_sidebar_state="expanded")
 load_dotenv()
 
-# --- CUSTOM CSS FOR POLISHED UI ---
+# ------------------------------------------------------
+# Ambient Background Injection
+# ------------------------------------------------------
 st.markdown("""
-    <style>
-    .stMetric { background-color: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #e0e0e0; }
-    .stSpinner > div > div { border-color: #0052cc transparent transparent transparent; }
-    /* Hide sidebar by default on the login screen */
-    [data-testid="collapsedControl"] { display: none; }
-    </style>
+    <div class="ambient-blob blob-1"></div>
+    <div class="ambient-blob blob-2"></div>
+    <div class="ambient-blob blob-3"></div>
 """, unsafe_allow_html=True)
+
+# ------------------------------------------------------
+# 2026 Modern SaaS UI Theme (Glassmorphism & Minimalism)
+# ------------------------------------------------------
+def apply_custom_theme():
+    st.markdown("""
+    <style>
+        /* Import Google Font */
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+        /* Apply Font Globally */
+        html, body, [class*="css"], .stTextInput > label, .stSelectbox > label, .stMarkdown {
+            font-family: 'Outfit', sans-serif !important;
+        }
+
+        header {background-color: transparent !important;}
+
+        /* Main App Background */
+        .stApp {
+            background-color: #fafbfc;
+            background-image: radial-gradient(circle at 10% 20%, rgba(240, 242, 250, 0.8) 0%, rgba(255, 255, 255, 0.8) 90%);
+        }
+
+        /* Ambient Blobs Animation */
+        .ambient-blob {
+            position: fixed;
+            filter: blur(90px);
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none; 
+        }
+        
+        .blob-1 {
+            top: -10%; left: -10%;
+            width: 50vw; height: 50vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 65, 108, 0.3) 0%, rgba(255, 65, 108, 0) 70%);
+            animation: float1 20s infinite alternate ease-in-out;
+        }
+        
+        .blob-2 {
+            bottom: -20%; right: -10%;
+            width: 60vw; height: 60vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, rgba(139, 92, 246, 0) 70%);
+            animation: float2 25s infinite alternate-reverse ease-in-out;
+        }
+
+        .blob-3 {
+            top: 20%; right: 20%;
+            width: 40vw; height: 40vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0) 70%);
+            animation: float3 22s infinite alternate ease-in-out;
+        }
+
+        @keyframes float1 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(10%, 15%) scale(1.1); } }
+        @keyframes float2 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-15%, -10%) scale(1.2); } }
+        @keyframes float3 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-20%, 20%) scale(1.15); } }
+
+        .block-container, [data-testid="stSidebar"] {
+            z-index: 1;
+        }
+
+        /* Glassmorphism Sidebar */
+        [data-testid="stSidebar"] {
+            background: rgba(255, 255, 255, 0.4) !important;
+            backdrop-filter: blur(25px) !important;
+            -webkit-backdrop-filter: blur(25px) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.5) !important;
+        }
+
+        /* Animated Title Gradient */
+        @keyframes title-flow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        h1, h2 {
+            font-weight: 800 !important;
+            letter-spacing: -1px;
+            text-align: center;
+            background: linear-gradient(-45deg, #FF4B2B, #FF416C, #2563eb, #8B5CF6);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: title-flow 6s ease infinite;
+            filter: drop-shadow(0px 4px 15px rgba(37, 99, 235, 0.2));
+            margin-bottom: 0.5rem !important;
+        }
+
+        /* Glassmorphism Metrics (KPI Cards) */
+        .stMetric {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 18px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+        }
+        .stMetric:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.05);
+        }
+
+        /* Glassmorphism Containers (replaces default st.container borders) */
+        [data-testid="stVerticalBlock"] > div[style*="border"] {
+            border: 1px solid rgba(255,255,255,0.8) !important;
+            border-radius: 18px !important;
+            background: rgba(255,255,255,0.5) !important;
+            backdrop-filter: blur(10px) !important;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.02) !important;
+        }
+
+        /* Glassmorphism Buttons */
+        .stButton>button {
+            border-radius: 12px !important;
+            border: 1px solid rgba(255,255,255,0.6) !important;
+            background: rgba(255,255,255,0.7) !important;
+            backdrop-filter: blur(10px) !important;
+            font-weight: 500 !important;
+            color: #27272a !important;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+        }
+
+        .stButton>button:hover {
+            background: #18181b !important;
+            color: #ffffff !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
+        }
+
+        /* Primary Button Override */
+        .stButton>button[kind="primary"] {
+            background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+            color: #ffffff !important;
+            border: none !important;
+        }
+        .stButton>button[kind="primary"]:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3) !important;
+        }
+
+        /* Spinner Color Match */
+        .stSpinner > div > div { border-color: #3b82f6 transparent transparent transparent; }
+        
+        /* Hide sidebar by default on the login screen */
+        [data-testid="collapsedControl"] { display: none; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Apply Theme immediately
+apply_custom_theme()
 
 
 # --- CORE FUNCTIONS ---
+def math_success_animation():
+    """Injects CSS to display a floating math/numbers animation on success."""
+    st.markdown("""
+        <style>
+        .math-float {
+            position: fixed;
+            bottom: -50px;
+            color: rgba(37, 99, 235, 0.8);
+            font-size: 2.2rem;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            z-index: 99999;
+            animation: floatMathUp 3.5s ease-in forwards;
+            pointer-events: none;
+        }
+        @keyframes floatMathUp {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-120vh) rotate(360deg); opacity: 0; }
+        }
+        </style>
+        <div class="math-float" style="left: 5%; animation-duration: 3.5s; animation-delay: 0s;">∑</div>
+        <div class="math-float" style="left: 15%; animation-duration: 4.2s; animation-delay: 0.2s;">∫</div>
+        <div class="math-float" style="left: 25%; animation-duration: 3.1s; animation-delay: 0.5s;">%</div>
+        <div class="math-float" style="left: 35%; animation-duration: 4.5s; animation-delay: 0.1s;">π</div>
+        <div class="math-float" style="left: 45%; animation-duration: 3.2s; animation-delay: 0.3s;">∞</div>
+        <div class="math-float" style="left: 55%; animation-duration: 3.8s; animation-delay: 0.6s;">42</div>
+        <div class="math-float" style="left: 65%; animation-duration: 4.1s; animation-delay: 0.4s;">3.14</div>
+        <div class="math-float" style="left: 75%; animation-duration: 3.4s; animation-delay: 0.7s;">01</div>
+        <div class="math-float" style="left: 85%; animation-duration: 4.2s; animation-delay: 0.2s;">√</div>
+        <div class="math-float" style="left: 95%; animation-duration: 3.6s; animation-delay: 0.5s;">ƒ(x)</div>
+        """, unsafe_allow_html=True)
+
 def authenticate_jira(url, email, token):
     """Establish connection to Jira API with session state."""
     try:
@@ -88,7 +276,6 @@ def build_jql(projects, start_date, end_date, assignees, statuses, is_time_loggi
 
 def fetch_issues(jira, jql_query):
     with st.spinner('Fetching detailed task data from Jira...'):
-        # Added 'duedate' to the requested fields
         issues = jira.enhanced_search_issues(
             jql_str=jql_query, maxResults=False, 
             fields="project,summary,assignee,status,issuetype,timeoriginalestimate,timespent,timeestimate,worklog,duedate"
@@ -108,7 +295,6 @@ def process_issues_to_dataframe(jira_client, issues, start_date, end_date, is_ti
         rem_est_hours = (getattr(fields, 'timeestimate', 0) or 0) / 3600.0
         current_assignee = fields.assignee.displayName if hasattr(fields, 'assignee') and fields.assignee else "Unassigned"
         
-        # Extract Due Date safely
         due_date_val = getattr(fields, 'duedate', None)
         due_date_str = due_date_val if due_date_val else "Not Set"
         
@@ -182,8 +368,8 @@ if 'jira_client' not in st.session_state:
             <div style='text-align: center; margin-bottom: 10px;'>
                 <img src='https://cdn.icon-icons.com/icons2/2699/PNG/512/atlassian_jira_logo_icon_170511.png' width='80'>
             </div>
-            <h2 style='text-align: center; color: #0052cc; margin-top: 0px;'>📊 Enterprise Resource Hub</h2>
-            <p style='text-align: center; color: #6b778c;'>Sign in to access Jira portfolio metrics</p>
+            <h2>📊 Enterprise Resource Hub</h2>
+            <p style='text-align: center; color: #64748b;'>Sign in to access Jira portfolio metrics</p>
         """, unsafe_allow_html=True)
         
         with st.container(border=True):
@@ -241,11 +427,13 @@ else:
     # ==========================================
     
     st.markdown("""<style>[data-testid="collapsedControl"] { display: block; }</style>""", unsafe_allow_html=True)
-    st.sidebar.title("Atlassian Jira")
-    st.sidebar.success("✅ Connected securely")
-    if st.sidebar.button("Logout", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
+    
+    with st.sidebar:
+        st.title("Atlassian Jira")
+        st.success("✅ Connected securely")
+        if st.button("Logout", type="primary", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
 
     st.title("📊 Enterprise Resource Hub")
     
@@ -309,6 +497,9 @@ else:
                     st.session_state['time_col'] = time_col
                     st.success(f"Successfully processed {len(issues)} tickets!")
                     
+                    # TRIGGER CUSTOM MATH ANIMATION HERE
+                    math_success_animation()
+                    
         # --- RENDER RESULTS ---
         if 'processed_df' in st.session_state:
             df = st.session_state['processed_df']
@@ -335,6 +526,7 @@ else:
                                     value_vars=["Original Estimate (hrs)", time_col, "Remaining Estimate (hrs)"],
                                     var_name='Metric', value_name='Hours')
                 
+                # Transparent background to fit glassmorphism theme
                 chart = alt.Chart(melted_df).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
                     x=alt.X('Resource:N', title="", axis=alt.Axis(labelAngle=-0, labelOverlap=True)),
                     y=alt.Y('Hours:Q', title="Hours Logged / Estimated"),
@@ -343,7 +535,7 @@ else:
                                     legend=alt.Legend(title="", orient="top", padding=10)),
                     xOffset='Metric:N',
                     tooltip=['Resource', 'Metric', 'Hours']
-                ).properties(height=450).configure_view(strokeOpacity=0).configure_axis(grid=False)
+                ).properties(height=450).configure_view(strokeOpacity=0).configure_axis(grid=False).configure(background='transparent')
                 
                 st.altair_chart(chart, use_container_width=True)
 
