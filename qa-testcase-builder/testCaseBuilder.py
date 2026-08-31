@@ -2,21 +2,43 @@ import streamlit as st
 import pandas as pd
 import PyPDF2
 import json
-import os
 from io import StringIO
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
-# LLM Providers
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # --- Page Configuration ---
 st.set_page_config(page_title="AI QA Test Case Generator", page_icon="🧪", layout="wide")
 
+# --- Session State Management ---
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+if 'api_key' not in st.session_state:
+    st.session_state['api_key'] = ''
+if 'llm_provider' not in st.session_state:
+    st.session_state['llm_provider'] = ''
+
+def login():
+    """Handles the authentication logic using the API Key."""
+    provider = st.session_state['provider_input']
+    key = st.session_state['api_key_input'].strip()
+    
+    if key:
+        st.session_state['logged_in'] = True
+        st.session_state['llm_provider'] = provider
+        st.session_state['api_key'] = key
+    else:
+        st.error(f"Please enter a valid {provider} API Key to continue.")
+
+def logout():
+    """Clears the session state and logs the user out."""
+    st.session_state['logged_in'] = False
+    st.session_state['api_key'] = ''
+    st.session_state['llm_provider'] = ''
+    
 # --- Helper Functions ---
 def extract_text_from_pdf(pdf_file):
-    """Extracts text from an uploaded PDF file."""
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
     for page in reader.pages:
@@ -24,12 +46,10 @@ def extract_text_from_pdf(pdf_file):
     return text
 
 def extract_text_from_txt(txt_file):
-    """Extracts text from an uploaded TXT file."""
     stringio = StringIO(txt_file.getvalue().decode("utf-8"))
     return stringio.read()
 
 def parse_template(template_file, file_name):
-    """Extracts headers or sample structure from a template file."""
     if file_name.endswith('.csv'):
         df = pd.read_csv(template_file, nrows=5) 
         return f"CSV Headers: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
@@ -37,11 +57,7 @@ def parse_template(template_file, file_name):
         return extract_text_from_txt(template_file)
     return ""
 
-# --- LangChain Orchestration ---
 def generate_test_cases(llm, doc_text, template_structure, issue_desc):
-    """Handles the orchestration regardless of which LLM provider was passed in."""
-    
-    # STEP A: Analyze the template and generate format instructions
     template_prompt = ChatPromptTemplate.from_messages([
         ("system", "You are a data formatting expert. Analyze the provided test case template structure. "
                    "Output a strict list of the required JSON keys (columns) that the user expects in their test cases. "
@@ -52,7 +68,6 @@ def generate_test_cases(llm, doc_text, template_structure, issue_desc):
     chain_a = template_prompt | llm | StrOutputParser()
     required_columns = chain_a.invoke({"template_structure": template_structure})
     
-    # STEP B: Generate the test cases using the extracted format
     generation_prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a Senior QA Automation Engineer. Generate comprehensive test cases based on the provided product document and enhancement description.
         
@@ -67,101 +82,110 @@ def generate_test_cases(llm, doc_text, template_structure, issue_desc):
     ])
     
     chain_b = generation_prompt | llm | StrOutputParser()
-    raw_json_output = chain_b.invoke({
+    return chain_b.invoke({
         "required_columns": required_columns,
         "doc_text": doc_text,
         "issue_desc": issue_desc
     })
-    
-    return raw_json_output
 
-# --- Streamlit UI ---
-st.title("🧪 AI QA Test Case Generator")
-st.markdown("Upload your product documentation and your team's test case template to dynamically generate structured QA tests.")
+# --- UI Views ---
 
-# Sidebar for Configuration & Uploads
-with st.sidebar:
-    st.header("Configuration")
+def login_view():
+    """Renders the gateway login screen asking for API keys."""
+    col1, col2, col3 = st.columns([1, 1, 1])
     
-    # Provider Selection
-    llm_provider = st.selectbox("Select AI Provider", ["Google Gemini", "OpenAI"])
-    
-    # Dynamic API Key Input
-    if llm_provider == "OpenAI":
-        api_key = st.text_input("OpenAI API Key (sk-...)", type="password")
-        model_name = "gpt-4o"
-    elif llm_provider == "Google Gemini":
-        api_key = st.text_input("Google Gemini API Key", type="password")
-        model_name = "gemini-1.5-pro"
+    with col2:
+        st.write("") 
+        st.write("")
+        st.markdown("<h2 style='text-align: center; color: #1E88E5;'>Sign In</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Authenticate with your AI Provider</p>", unsafe_allow_html=True)
         
-    st.divider()
-    
-    st.header("1. Upload Documents")
-    doc_file = st.file_uploader("Upload Product Document (PDF/TXT)", type=['pdf', 'txt'])
-    
-    st.header("2. Upload Template")
-    template_file = st.file_uploader("Upload Custom Template (CSV/TXT)", type=['csv', 'txt'])
+        with st.container(border=True):
+            st.selectbox("Select AI Provider", ["Google Gemini", "OpenAI"], key="provider_input")
+            st.text_input("API Key", type="password", key="api_key_input", placeholder="Enter your API key")
+            st.button("Login", type="primary", use_container_width=True, on_click=login)
+        
+        st.info("Your API key is used strictly for this session and is not stored permanently.")
 
-# Main Content Area
-st.header("3. Issue / Enhancement Description")
-issue_description = st.text_area("Describe the bug, feature, or enhancement to test:", height=150, 
-                                 placeholder="e.g., The user login endpoint should now lock the account after 5 failed attempts...")
+def main_app_view():
+    """Renders the core application once logged in."""
+    col_title, col_logout = st.columns([4, 1])
+    with col_title:
+        st.title("🧪 AI QA Test Case Generator")
+    with col_logout:
+        st.write("") 
+        st.button("Logout", on_click=logout, use_container_width=True)
 
-# Action Button
-if st.button("Generate Tests", type="primary", use_container_width=True):
-    if not api_key:
-        st.error(f"Please provide your {llm_provider} API Key in the sidebar.")
-    elif not doc_file:
-        st.error("Please upload a Product Document.")
-    elif not template_file:
-        st.error("Please upload a Test Case Template.")
-    elif not issue_description.strip():
-        st.error("Please provide an issue or enhancement description.")
-    else:
-        with st.spinner(f"Generating tests using {llm_provider}..."):
-            try:
-                # Initialize the chosen LLM
-                if llm_provider == "OpenAI":
-                    llm = ChatOpenAI(model=model_name, temperature=0.2, openai_api_key=api_key)
-                elif llm_provider == "Google Gemini":
-                    # Initialize Gemini API
-                    llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.2, api_key=api_key)
-                
-                # 1. Parse Document
-                if doc_file.name.endswith('.pdf'):
-                    doc_text = extract_text_from_pdf(doc_file)
-                else:
-                    doc_text = extract_text_from_txt(doc_file)
-                
-                # 2. Parse Template
-                template_structure = parse_template(template_file, template_file.name)
-                
-                # 3. Orchestrate LangChain processing (pass the initialized LLM)
-                json_result = generate_test_cases(llm, doc_text, template_structure, issue_description)
-                
-                # 4. Convert JSON to Pandas DataFrame
+    st.markdown("Upload your product documentation and your team's test case template to dynamically generate structured QA tests.")
+
+    # Sidebar for Configuration & Uploads
+    with st.sidebar:
+        st.success(f"Connected via **{st.session_state['llm_provider']}**")
+        st.divider()
+        
+        st.header("1. Upload Documents")
+        doc_file = st.file_uploader("Upload Product Document (PDF/TXT)", type=['pdf', 'txt'])
+        
+        st.header("2. Upload Template")
+        template_file = st.file_uploader("Upload Custom Template (CSV/TXT)", type=['csv', 'txt'])
+
+    # Main Content Area
+    st.header("3. Issue / Enhancement Description")
+    issue_description = st.text_area("Describe the bug, feature, or enhancement to test:", height=150, 
+                                     placeholder="e.g., The user login endpoint should now lock the account after 5 failed attempts...")
+
+    if st.button("Generate Tests", type="primary", use_container_width=True):
+        if not doc_file:
+            st.error("Please upload a Product Document.")
+        elif not template_file:
+            st.error("Please upload a Test Case Template.")
+        elif not issue_description.strip():
+            st.error("Please provide an issue or enhancement description.")
+        else:
+            with st.spinner(f"Generating tests using {st.session_state['llm_provider']}..."):
                 try:
-                    # Clean up the output in case the LLM added markdown formatting
-                    clean_json = json_result.replace("```json", "").replace("```", "").strip()
-                    test_cases_list = json.loads(clean_json)
-                    df = pd.DataFrame(test_cases_list)
+                    # Initialize the LLM using session state variables
+                    provider = st.session_state['llm_provider']
+                    api_key = st.session_state['api_key']
                     
-                    st.success("Test cases generated successfully!")
+                    if provider == "OpenAI":
+                        llm = ChatOpenAI(model="gpt-4o", temperature=0.2, openai_api_key=api_key)
+                    elif provider == "Google Gemini":
+                        llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.2, api_key=api_key)
                     
-                    # Display the DataFrame
-                    st.dataframe(df, use_container_width=True)
+                    if doc_file.name.endswith('.pdf'):
+                        doc_text = extract_text_from_pdf(doc_file)
+                    else:
+                        doc_text = extract_text_from_txt(doc_file)
                     
-                    # Provide Download Button
-                    csv = df.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="Download Test Cases as CSV",
-                        data=csv,
-                        file_name='generated_test_cases.csv',
-                        mime='text/csv',
-                    )
-                except json.JSONDecodeError:
-                    st.error("The AI failed to generate valid JSON. Raw output below:")
-                    st.write(json_result)
+                    template_structure = parse_template(template_file, template_file.name)
+                    json_result = generate_test_cases(llm, doc_text, template_structure, issue_description)
                     
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
+                    try:
+                        clean_json = json_result.replace("```json", "").replace("```", "").strip()
+                        test_cases_list = json.loads(clean_json)
+                        df = pd.DataFrame(test_cases_list)
+                        
+                        st.success("Test cases generated successfully!")
+                        st.dataframe(df, use_container_width=True)
+                        
+                        csv = df.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="Download Test Cases as CSV",
+                            data=csv,
+                            file_name='generated_test_cases.csv',
+                            mime='text/csv',
+                        )
+                    except json.JSONDecodeError:
+                        st.error("The AI failed to generate valid JSON. Raw output below:")
+                        st.write(json_result)
+                        
+                except Exception as e:
+                    # Catch authentication errors (e.g., invalid key) at runtime
+                    st.error(f"An error occurred. Please check your API key and try again. Error details: {e}")
+
+# --- Routing Logic ---
+if st.session_state['logged_in']:
+    main_app_view()
+else:
+    login_view()
