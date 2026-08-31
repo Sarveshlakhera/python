@@ -37,7 +37,7 @@ def logout():
     st.session_state['api_key'] = ''
     st.session_state['llm_provider'] = ''
     
-# --- Helper Functions ---
+# --- Helper Functions (Updated for Excel support) ---
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
@@ -50,11 +50,25 @@ def extract_text_from_txt(txt_file):
     return stringio.read()
 
 def parse_template(template_file, file_name):
-    if file_name.endswith('.csv'):
-        df = pd.read_csv(template_file, nrows=5) 
-        return f"CSV Headers: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
-    elif file_name.endswith('.txt'):
-        return extract_text_from_txt(template_file)
+    """Extracts headers or sample structure from CSV, TXT, or Excel."""
+    try:
+        # Handle CSV
+        if file_name.endswith('.csv'):
+            df = pd.read_csv(template_file, nrows=5) 
+            return f"Columns: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
+        
+        # Handle Excel
+        elif file_name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(template_file, nrows=5) 
+            return f"Columns: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
+        
+        # Handle Text
+        elif file_name.endswith('.txt'):
+            return extract_text_from_txt(template_file)
+            
+    except Exception as e:
+        return f"Error parsing template: {e}"
+    
     return ""
 
 def generate_test_cases(llm, doc_text, template_structure, issue_desc):
@@ -124,10 +138,12 @@ def main_app_view():
         st.divider()
         
         st.header("1. Upload Documents")
-        doc_file = st.file_uploader("Upload Product Document (PDF/TXT)", type=['pdf', 'txt'])
+        # Updated to accept txt
+        doc_file = st.file_uploader("Upload Product Document", type=['pdf', 'txt'])
         
         st.header("2. Upload Template")
-        template_file = st.file_uploader("Upload Custom Template (CSV/TXT)", type=['csv', 'txt'])
+        # Updated to accept xls and xlsx alongside csv and txt
+        template_file = st.file_uploader("Upload Custom Template", type=['csv', 'txt', 'xls', 'xlsx'])
 
     # Main Content Area
     st.header("3. Issue / Enhancement Description")
@@ -144,7 +160,6 @@ def main_app_view():
         else:
             with st.spinner(f"Generating tests using {st.session_state['llm_provider']}..."):
                 try:
-                    # Initialize the LLM using session state variables
                     provider = st.session_state['llm_provider']
                     api_key = st.session_state['api_key']
                     
@@ -153,12 +168,16 @@ def main_app_view():
                     elif provider == "Google Gemini":
                         llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.2, api_key=api_key)
                     
+                    # Extract document text based on file type
                     if doc_file.name.endswith('.pdf'):
                         doc_text = extract_text_from_pdf(doc_file)
                     else:
                         doc_text = extract_text_from_txt(doc_file)
                     
+                    # Parse the template (now supports Excel)
                     template_structure = parse_template(template_file, template_file.name)
+                    
+                    # Send to LangChain
                     json_result = generate_test_cases(llm, doc_text, template_structure, issue_description)
                     
                     try:
@@ -181,7 +200,6 @@ def main_app_view():
                         st.write(json_result)
                         
                 except Exception as e:
-                    # Catch authentication errors (e.g., invalid key) at runtime
                     st.error(f"An error occurred. Please check your API key and try again. Error details: {e}")
 
 # --- Routing Logic ---
