@@ -37,7 +37,7 @@ def logout():
     st.session_state['api_key'] = ''
     st.session_state['llm_provider'] = ''
     
-# --- Helper Functions (Updated for Excel support) ---
+# --- Helper Functions (Updated for Full Excel Support) ---
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
@@ -49,20 +49,31 @@ def extract_text_from_txt(txt_file):
     stringio = StringIO(txt_file.getvalue().decode("utf-8"))
     return stringio.read()
 
+def extract_text_from_excel(excel_file):
+    """Extracts text from all sheets of an Excel Product Document."""
+    try:
+        # Read all sheets into a dictionary of dataframes
+        dfs = pd.read_excel(excel_file, sheet_name=None)
+        text = ""
+        for sheet_name, df in dfs.items():
+            text += f"--- Sheet: {sheet_name} ---\n"
+            # Convert to CSV format string (compact and LLM-friendly)
+            text += df.to_csv(index=False) + "\n\n"
+        return text
+    except Exception as e:
+        return f"Error extracting text from Excel document: {e}"
+
 def parse_template(template_file, file_name):
     """Extracts headers or sample structure from CSV, TXT, or Excel."""
     try:
-        # Handle CSV
         if file_name.endswith('.csv'):
             df = pd.read_csv(template_file, nrows=5) 
             return f"Columns: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
         
-        # Handle Excel
         elif file_name.endswith(('.xls', '.xlsx')):
             df = pd.read_excel(template_file, nrows=5) 
             return f"Columns: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
         
-        # Handle Text
         elif file_name.endswith('.txt'):
             return extract_text_from_txt(template_file)
             
@@ -138,11 +149,10 @@ def main_app_view():
         st.divider()
         
         st.header("1. Upload Documents")
-        # Updated to accept txt
-        doc_file = st.file_uploader("Upload Product Document", type=['pdf', 'txt'])
+        # Updated to accept xls and xlsx
+        doc_file = st.file_uploader("Upload Product Document", type=['pdf', 'txt', 'xls', 'xlsx'])
         
         st.header("2. Upload Template")
-        # Updated to accept xls and xlsx alongside csv and txt
         template_file = st.file_uploader("Upload Custom Template", type=['csv', 'txt', 'xls', 'xlsx'])
 
     # Main Content Area
@@ -168,13 +178,15 @@ def main_app_view():
                     elif provider == "Google Gemini":
                         llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.2, api_key=api_key)
                     
-                    # Extract document text based on file type
+                    # Extract document text based on file type (Now includes Excel routing)
                     if doc_file.name.endswith('.pdf'):
                         doc_text = extract_text_from_pdf(doc_file)
+                    elif doc_file.name.endswith(('.xls', '.xlsx')):
+                        doc_text = extract_text_from_excel(doc_file)
                     else:
                         doc_text = extract_text_from_txt(doc_file)
                     
-                    # Parse the template (now supports Excel)
+                    # Parse the template 
                     template_structure = parse_template(template_file, template_file.name)
                     
                     # Send to LangChain
