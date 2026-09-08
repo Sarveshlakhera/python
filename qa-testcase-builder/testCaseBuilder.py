@@ -1,17 +1,45 @@
 import streamlit as st
 import pandas as pd
 import PyPDF2
+import time
 from io import StringIO, BytesIO
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# --- Universal LLM Imports ---
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_groq import ChatGroq
+from langchain_anthropic import ChatAnthropic
 
 # --- Page Configuration ---
 st.set_page_config(page_title="AI QA Test Case Generator", page_icon="🧪", layout="wide")
+
+# --- Supported Models Dictionary ---
+AVAILABLE_MODELS = {
+    "Google Gemini": [
+        "gemini-3.6-flash", 
+        "gemini-1.5-flash", 
+        "gemini-1.5-pro"
+    ],
+    "OpenAI": [
+        "gpt-4o", 
+        "gpt-4o-mini", 
+        "gpt-4-turbo"
+    ],
+    "Groq": [
+        "llama-3.3-70b-versatile", 
+        "llama-3.1-8b-instant"
+    ],
+    "Anthropic Claude": [
+        "claude-fable-5", 
+        "claude-opus-4-8", 
+        "claude-sonnet-4-5"
+    ]
+}
 
 # --- Session State Management ---
 if 'logged_in' not in st.session_state:
@@ -22,7 +50,7 @@ if 'llm_provider' not in st.session_state:
     st.session_state['llm_provider'] = ''
 
 def login():
-    """Handles the authentication logic using the API Key."""
+    """Handles the authentication logic using the chosen Platform and API Key."""
     provider = st.session_state['provider_input']
     key = st.session_state['api_key_input'].strip()
     
@@ -31,7 +59,7 @@ def login():
         st.session_state['llm_provider'] = provider
         st.session_state['api_key'] = key
     else:
-        st.error(f"Please enter a valid {provider} API Key to continue.")
+        st.error(f"Please enter a valid API Key for {provider} to continue.")
 
 def logout():
     """Clears the session state and logs the user out."""
@@ -49,13 +77,11 @@ class TestCaseGeneration(BaseModel):
 
 # --- Helper Functions (Text Extraction) ---
 def chunk_text(text: str, chunk_size: int = 15000) -> str:
-    """Chunks large text to prevent context window overflow."""
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=1000)
     chunks = splitter.split_text(text)
     return chunks[0] if chunks else ""
 
 def process_uploaded_file(uploaded_file) -> str:
-    """Routes the uploaded file to the correct extraction method."""
     if not uploaded_file:
         return ""
     
@@ -78,7 +104,7 @@ def process_uploaded_file(uploaded_file) -> str:
             st.error(f"Error extracting Excel text from {uploaded_file.name}: {e}")
             return ""
             
-    else: # txt, csv, or code files (.sh, .ksh, .py, etc.)
+    else: 
         try:
             stringio = StringIO(uploaded_file.getvalue().decode("utf-8"))
             return chunk_text(stringio.read())
@@ -87,7 +113,6 @@ def process_uploaded_file(uploaded_file) -> str:
             return ""
 
 def extract_template_headers(template_file, file_name) -> list:
-    """Programmatically extracts headers to enforce dynamic schema."""
     try:
         if file_name.endswith('.csv'):
             return pd.read_csv(template_file, nrows=0).columns.tolist()
@@ -102,10 +127,20 @@ def extract_template_headers(template_file, file_name) -> list:
     return []
 
 # --- AI Core Logic (Layered Synthesis) ---
+def get_llm_instance(provider: str, model_name: str, api_key: str):
+    """Dynamically instantiates the correct LangChain LLM based on user selection."""
+    if provider == "OpenAI":
+        return ChatOpenAI(model=model_name, temperature=0.1, openai_api_key=api_key)
+    elif provider == "Google Gemini":
+        return ChatGoogleGenerativeAI(model=model_name, temperature=0.1, api_key=api_key)
+    elif provider == "Groq":
+        return ChatGroq(model=model_name, temperature=0.1, api_key=api_key)
+    elif provider == "Anthropic Claude":
+        return ChatAnthropic(model=model_name, temperature=0.1, api_key=api_key)
+    else:
+        raise ValueError("Unsupported AI Provider")
+
 def extract_layer_scenarios(llm, doc_text: str, layer_name: str, issue_desc: str) -> List[str]:
-    """Phase 1: Extracts scenarios strictly for a specific domain layer."""
-    
-    # Contextual instruction adjustment for Code layer vs Document layers
     if layer_name == "Source Code":
         system_instruction = "You are an expert QA Engineer. Analyze the provided source code snippet and the enhancement request. Extract a detailed list of white-box test scenarios. Focus heavily on hardcoded constraints, conditional logic branches (if/else), exact boundary values, error handling, and expected exceptions."
     else:
@@ -130,7 +165,6 @@ def extract_layer_scenarios(llm, doc_text: str, layer_name: str, issue_desc: str
     return result.scenarios if result else []
 
 def synthesize_final_tests(llm, aggregated_scenarios: str, required_columns: list, issue_desc: str) -> TestCaseGeneration:
-    """Phase 2: Master synthesis to deduplicate and format tests."""
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are a Lead QA Automation Engineer. You have been provided with test scenarios extracted from various layers (UI, Backend, Database, Code) for an enhancement request.
         
@@ -162,7 +196,7 @@ def synthesize_final_tests(llm, aggregated_scenarios: str, required_columns: lis
 
 # --- UI Views ---
 def login_view():
-    """Renders the gateway login screen asking for API keys."""
+    """Renders the gateway login screen asking for platform and API key."""
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col2:
@@ -172,7 +206,7 @@ def login_view():
         st.markdown("<p style='text-align: center;'>Authenticate with your AI Provider</p>", unsafe_allow_html=True)
         
         with st.container(border=True):
-            st.selectbox("Select Platform", ["Google Gemini", "OpenAI"], key="provider_input")
+            st.selectbox("Select Platform", list(AVAILABLE_MODELS.keys()), key="provider_input")
             st.text_input("API Key", type="password", key="api_key_input", placeholder="Enter the API key for chosen platform")
             st.button("Login", type="primary", use_container_width=True, on_click=login)
         
@@ -191,7 +225,12 @@ def main_app_view():
 
     # Sidebar for Configuration & Uploads
     with st.sidebar:
-        st.success(f"Connected via **{st.session_state['llm_provider']}**")
+        provider = st.session_state['llm_provider']
+        st.success(f"Connected via **{provider}**")
+        
+        # --- NEW MODEL SELECTION DROPDOWN ---
+        st.selectbox("Select Model", AVAILABLE_MODELS[provider], key="selected_model")
+        
         st.divider()
         
         st.header("1. Upload Documents & Code")
@@ -201,7 +240,6 @@ def main_app_view():
         db_file = st.file_uploader("Database/Schema Document", type=['pdf', 'txt', 'xls', 'xlsx'])
         general_file = st.file_uploader("General Product Document", type=['pdf', 'txt', 'xls', 'xlsx'])
         
-        # --- NEW CODE UPLOADER ---
         code_file = st.file_uploader("Source Code Snippet", type=['py', 'js', 'java', 'cpp', 'cs', 'sh', 'ksh', 'txt', 'json'])
         st.caption("⚠️ **Privacy Warning:** Do not upload sensitive or proprietary source code unless your API key is bound to a zero-data-retention enterprise agreement.")
         
@@ -222,15 +260,13 @@ def main_app_view():
             st.error("Please provide an issue or enhancement description.")
         else:
             try:
-                # Initialize LLM
-                provider = st.session_state['llm_provider']
-                api_key = st.session_state['api_key']
-                if provider == "OpenAI":
-                    llm = ChatOpenAI(model="gpt-4o", temperature=0.1, openai_api_key=api_key)
-                else:
-                    llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", temperature=0.1, api_key=api_key)
+                # Initialize universally selected LLM
+                llm = get_llm_instance(
+                    provider=st.session_state['llm_provider'], 
+                    model_name=st.session_state['selected_model'], 
+                    api_key=st.session_state['api_key']
+                )
 
-                # Extract Required Columns
                 required_columns = extract_template_headers(template_file, template_file.name)
                 if not required_columns:
                     st.error("Failed to extract columns. Please check the template file.")
@@ -238,39 +274,37 @@ def main_app_view():
 
                 all_extracted_scenarios = ""
                 
-                # Execution with Status Container
-                with st.status("Running Layered Synthesis Architecture...", expanded=True) as status:
+                with st.status(f"Running Synthesis using {st.session_state['selected_model']}...", expanded=True) as status:
                     # Phase 1 extractions
                     if ui_file:
                         st.write("🔍 Analyzing UI/UX layer...")
-                        ui_text = process_uploaded_file(ui_file)
-                        ui_scenarios = extract_layer_scenarios(llm, ui_text, "UI/UX", issue_description)
+                        ui_scenarios = extract_layer_scenarios(llm, process_uploaded_file(ui_file), "UI/UX", issue_description)
                         all_extracted_scenarios += "\n<UI_SCENARIOS>\n" + "\n".join(ui_scenarios) + "\n</UI_SCENARIOS>\n"
+                        time.sleep(2) # Short cooldown for burst limits
 
                     if backend_file:
                         st.write("⚙️ Analyzing Backend/API layer...")
-                        backend_text = process_uploaded_file(backend_file)
-                        backend_scenarios = extract_layer_scenarios(llm, backend_text, "Backend", issue_description)
+                        backend_scenarios = extract_layer_scenarios(llm, process_uploaded_file(backend_file), "Backend", issue_description)
                         all_extracted_scenarios += "\n<BACKEND_SCENARIOS>\n" + "\n".join(backend_scenarios) + "\n</BACKEND_SCENARIOS>\n"
+                        time.sleep(2)
 
                     if db_file:
                         st.write("🗄️ Analyzing Database layer...")
-                        db_text = process_uploaded_file(db_file)
-                        db_scenarios = extract_layer_scenarios(llm, db_text, "Database", issue_description)
+                        db_scenarios = extract_layer_scenarios(llm, process_uploaded_file(db_file), "Database", issue_description)
                         all_extracted_scenarios += "\n<DATABASE_SCENARIOS>\n" + "\n".join(db_scenarios) + "\n</DATABASE_SCENARIOS>\n"
+                        time.sleep(2)
                         
                     if general_file:
                         st.write("📄 Analyzing General Product layer...")
-                        general_text = process_uploaded_file(general_file)
-                        general_scenarios = extract_layer_scenarios(llm, general_text, "General", issue_description)
+                        general_scenarios = extract_layer_scenarios(llm, process_uploaded_file(general_file), "General", issue_description)
                         all_extracted_scenarios += "\n<GENERAL_SCENARIOS>\n" + "\n".join(general_scenarios) + "\n</GENERAL_SCENARIOS>\n"
+                        time.sleep(2)
 
-                    # --- NEW CODE EXTRACTION ---
                     if code_file:
                         st.write("💻 Analyzing Source Code logic...")
-                        code_text = process_uploaded_file(code_file)
-                        code_scenarios = extract_layer_scenarios(llm, code_text, "Source Code", issue_description)
+                        code_scenarios = extract_layer_scenarios(llm, process_uploaded_file(code_file), "Source Code", issue_description)
                         all_extracted_scenarios += "\n<CODE_SCENARIOS>\n" + "\n".join(code_scenarios) + "\n</CODE_SCENARIOS>\n"
+                        time.sleep(2)
 
                     # Phase 2 Synthesis
                     st.write("🧠 Lead QA Agent synthesizing final test suite...")
