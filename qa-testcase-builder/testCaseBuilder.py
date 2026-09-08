@@ -1,12 +1,14 @@
 import streamlit as st
 import pandas as pd
 import PyPDF2
-import json
-from io import StringIO
+from io import StringIO, BytesIO
+from typing import List, Dict, Any
+from pydantic import BaseModel, Field
+
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # --- Page Configuration ---
 st.set_page_config(page_title="AI QA Test Case Generator", page_icon="🧪", layout="wide")
@@ -37,77 +39,101 @@ def logout():
     st.session_state['api_key'] = ''
     st.session_state['llm_provider'] = ''
     
-# --- Helper Functions (Updated for Full Excel Support) ---
-def extract_text_from_pdf(pdf_file):
-    reader = PyPDF2.PdfReader(pdf_file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() + "\n"
-    return text
+# --- Pydantic Data Models ---
+class TestCaseGeneration(BaseModel):
+    reasoning: str = Field(description="Step-by-step reasoning identifying affected modules, happy paths, negative paths, and boundary conditions.")
+    test_cases: List[Dict[str, Any]] = Field(description="The generated test cases. Keys must strictly match the required columns.")
 
-def extract_text_from_txt(txt_file):
-    stringio = StringIO(txt_file.getvalue().decode("utf-8"))
-    return stringio.read()
+# --- Helper Functions ---
+def chunk_text(text: str, chunk_size: int = 15000) -> str:
+    """Chunks large text to prevent context window overflow."""
+    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=1000)
+    chunks = splitter.split_text(text)
+    if len(chunks) > 1:
+        st.warning("Document is very large. Only processing the most relevant sections to maintain precision.")
+    return chunks[0] if chunks else ""
 
-def extract_text_from_excel(excel_file):
-    """Extracts text from all sheets of an Excel Product Document."""
+def extract_text_from_pdf(pdf_file) -> str:
     try:
-        # Read all sheets into a dictionary of dataframes
+        reader = PyPDF2.PdfReader(pdf_file)
+        text = "".join([page.extract_text() + "\n" for page in reader.pages])
+        return chunk_text(text)
+    except PyPDF2.errors.PdfReadError:
+        st.error("Could not read the PDF. The file might be corrupted or encrypted.")
+        return ""
+
+def extract_text_from_txt(txt_file) -> str:
+    try:
+        stringio = StringIO(txt_file.getvalue().decode("utf-8"))
+        return chunk_text(stringio.read())
+    except UnicodeDecodeError:
+        st.error("Encoding error. Please ensure the text file is UTF-8 encoded.")
+        return ""
+
+def extract_text_from_excel(excel_file) -> str:
+    try:
         dfs = pd.read_excel(excel_file, sheet_name=None)
         text = ""
         for sheet_name, df in dfs.items():
-            text += f"--- Sheet: {sheet_name} ---\n"
-            # Convert to CSV format string (compact and LLM-friendly)
-            text += df.to_csv(index=False) + "\n\n"
-        return text
+            if not df.empty:
+                text += f"--- Sheet: {sheet_name} ---\n{df.to_csv(index=False)}\n\n"
+        return chunk_text(text)
+    except pd.errors.EmptyDataError:
+        st.error("The uploaded Excel file appears to be empty.")
+        return ""
     except Exception as e:
-        return f"Error extracting text from Excel document: {e}"
+        st.error(f"Error extracting Excel text: {e}")
+        return ""
 
-def parse_template(template_file, file_name):
-    """Extracts headers or sample structure from CSV, TXT, or Excel."""
+def extract_template_headers(template_file, file_name) -> list:
+    """Programmatically extracts headers to enforce dynamic schema."""
     try:
         if file_name.endswith('.csv'):
-            df = pd.read_csv(template_file, nrows=5) 
-            return f"Columns: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
-        
+            df = pd.read_csv(template_file, nrows=0) 
+            return df.columns.tolist()
         elif file_name.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(template_file, nrows=5) 
-            return f"Columns: {', '.join(df.columns.tolist())}\nSample Data:\n{df.to_csv(index=False)}"
-        
+            df = pd.read_excel(template_file, nrows=0) 
+            return df.columns.tolist()
         elif file_name.endswith('.txt'):
-            return extract_text_from_txt(template_file)
-            
+            text = extract_text_from_txt(template_file)
+            return [line.strip() for line in text.split('\n') if line.strip()]
     except Exception as e:
-        return f"Error parsing template: {e}"
-    
-    return ""
+        st.error(f"Error parsing template headers: {e}")
+        return []
+    return []
 
-def generate_test_cases(llm, doc_text, template_structure, issue_desc):
-    template_prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a data formatting expert. Analyze the provided test case template structure. "
-                   "Output a strict list of the required JSON keys (columns) that the user expects in their test cases. "
-                   "Do not include any other text."),
-        ("user", "Template Structure:\n{template_structure}")
-    ])
-    
-    chain_a = template_prompt | llm | StrOutputParser()
-    required_columns = chain_a.invoke({"template_structure": template_structure})
+def generate_test_cases(llm, doc_text, required_columns, issue_desc) -> TestCaseGeneration:
+    """Generates structured test cases using LangChain and Pydantic."""
     
     generation_prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are a Senior QA Automation Engineer. Generate comprehensive test cases based on the provided product document and enhancement description.
+        ("system", """You are an elite Senior QA Automation Engineer. Your task is to generate comprehensive test cases based on the provided product document and enhancement request.
         
-        CRITICAL INSTRUCTION - OUTPUT FORMAT:
-        You MUST output ONLY a valid JSON array of objects. 
-        Each object in the array must represent a single test case.
-        Each object MUST use EXACTLY these keys based on the user's template: {required_columns}
+        REQUIRED TEST CASE COLUMNS:
+        {required_columns}
         
-        Do not include markdown formatting (like ```json). Just the raw JSON array.
-        Cover Happy Paths, Negative Paths, Boundary Cases, and Regression Risks."""),
-        ("user", "Product Context:\n{doc_text}\n\nRequested Enhancement/Issue:\n{issue_desc}")
+        INSTRUCTIONS:
+        1. Chain of Thought: First, analyze the enhancement request against the product document. Identify affected modules, happy paths, negative paths, boundary cases, and regression risks.
+        2. Test Cases: Generate the test cases. Every single test case object MUST use the EXACT keys listed in the REQUIRED TEST CASE COLUMNS above.
+        
+        EXAMPLE OF EXCELLENT QA DEPTH:
+        - Do not just test "User can login". Test "User account is locked after 5 consecutive failed attempts with incorrect password within a 10-minute window."
+        """),
+        ("user", """
+        <product_document>
+        {doc_text}
+        </product_document>
+        
+        <enhancement_request>
+        {issue_desc}
+        </enhancement_request>
+        """)
     ])
     
-    chain_b = generation_prompt | llm | StrOutputParser()
-    return chain_b.invoke({
+    # Enforce Pydantic schema structure natively 
+    structured_llm = llm.with_structured_output(TestCaseGeneration)
+    chain = generation_prompt | structured_llm
+    
+    return chain.invoke({
         "required_columns": required_columns,
         "doc_text": doc_text,
         "issue_desc": issue_desc
@@ -149,11 +175,10 @@ def main_app_view():
         st.divider()
         
         st.header("1. Upload Documents")
-        # Updated to accept xls and xlsx
         doc_file = st.file_uploader("Upload Product Document", type=['pdf', 'txt', 'xls', 'xlsx'])
         
         st.header("2. Upload Template")
-        template_file = st.file_uploader("Upload Custom Template", type=['csv', 'txt', 'xls', 'xlsx'])
+        template_file = st.file_uploader("Upload Custom Template (Empty with headers)", type=['csv', 'txt', 'xls', 'xlsx'])
 
     # Main Content Area
     st.header("3. Issue / Enhancement Description")
@@ -176,9 +201,9 @@ def main_app_view():
                     if provider == "OpenAI":
                         llm = ChatOpenAI(model="gpt-4o", temperature=0.2, openai_api_key=api_key)
                     elif provider == "Google Gemini":
-                        llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", temperature=0.2, api_key=api_key)
+                        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2, api_key=api_key)
                     
-                    # Extract document text based on file type (Now includes Excel routing)
+                    # Extract document text
                     if doc_file.name.endswith('.pdf'):
                         doc_text = extract_text_from_pdf(doc_file)
                     elif doc_file.name.endswith(('.xls', '.xlsx')):
@@ -186,30 +211,54 @@ def main_app_view():
                     else:
                         doc_text = extract_text_from_txt(doc_file)
                     
-                    # Parse the template 
-                    template_structure = parse_template(template_file, template_file.name)
+                    # Programmatically extract required headers
+                    required_columns = extract_template_headers(template_file, template_file.name)
                     
-                    # Send to LangChain
-                    json_result = generate_test_cases(llm, doc_text, template_structure, issue_description)
+                    if not required_columns:
+                        st.error("Failed to extract columns from the template. Please check the file format.")
+                        st.stop()
                     
-                    try:
-                        clean_json = json_result.replace("```json", "").replace("```", "").strip()
-                        test_cases_list = json.loads(clean_json)
-                        df = pd.DataFrame(test_cases_list)
-                        
+                    # Send to LangChain with Pydantic structured output
+                    result: TestCaseGeneration = generate_test_cases(llm, doc_text, required_columns, issue_description)
+                    
+                    # Display Reasoning
+                    with st.expander("🤖 AI Test Strategy & Reasoning", expanded=False):
+                        st.write(result.reasoning)
+                    
+                    # Display Dataframe and Download Buttons
+                    if result.test_cases:
+                        df = pd.DataFrame(result.test_cases)
                         st.success("Test cases generated successfully!")
                         st.dataframe(df, use_container_width=True)
                         
-                        csv = df.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            label="Download Test Cases as CSV",
-                            data=csv,
-                            file_name='generated_test_cases.csv',
-                            mime='text/csv',
-                        )
-                    except json.JSONDecodeError:
-                        st.error("The AI failed to generate valid JSON. Raw output below:")
-                        st.write(json_result)
+                        st.write("### Download Test Cases")
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            csv = df.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="📥 Download as CSV",
+                                data=csv,
+                                file_name='generated_test_cases.csv',
+                                mime='text/csv',
+                                use_container_width=True
+                            )
+                            
+                        with col2:
+                            buffer = BytesIO()
+                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                df.to_excel(writer, index=False, sheet_name='Test Cases')
+                            excel_data = buffer.getvalue()
+                            
+                            st.download_button(
+                                label="📥 Download as Excel",
+                                data=excel_data,
+                                file_name='generated_test_cases.xlsx',
+                                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                use_container_width=True
+                            )
+                    else:
+                        st.warning("The AI processed the request but did not return any test cases.")
                         
                 except Exception as e:
                     st.error(f"An error occurred. Please check your API key and try again. Error details: {e}")
