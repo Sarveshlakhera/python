@@ -176,7 +176,7 @@ def main_app_view():
                     if provider == "OpenAI":
                         llm = ChatOpenAI(model="gpt-4o", temperature=0.2, openai_api_key=api_key)
                     elif provider == "Google Gemini":
-                        llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", temperature=0.2, api_key=api_key)
+                        llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", temperature=0.2, api_key=api_key)
                     
                     # Extract document text based on file type (Now includes Excel routing)
                     if doc_file.name.endswith('.pdf'):
