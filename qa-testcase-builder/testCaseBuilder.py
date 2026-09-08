@@ -228,7 +228,7 @@ def main_app_view():
                 if provider == "OpenAI":
                     llm = ChatOpenAI(model="gpt-4o", temperature=0.1, openai_api_key=api_key)
                 else:
-                    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1, api_key=api_key)
+                    llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", temperature=0.1, api_key=api_key)
 
                 # Extract Required Columns
                 required_columns = extract_template_headers(template_file, template_file.name)
